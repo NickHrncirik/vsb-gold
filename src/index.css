@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+
+:root {
+  /* Brand palette from #VSB GOLD identity */
+  --bg: #fdf5e8;
+  --bg-deep: #f5ebd8;
+  --ink: #0a0a0a;
+  --ink-soft: #1a1a1a;
+  --muted: #6b6560;
+  --line: #e4ddd3;
+  --gold: #b8962e;
+  --gold-soft: #c9a84a;
+  --gold-dim: #8a7020;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+  width: 0;
+  height: 0;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  color: var(--ink);
+}
+
+/* Blackletter for #VSB — UnifrakturCook ≈ bold gothic lockup */
+.font-brand {
+  font-family: 'UnifrakturCook', 'UnifrakturMaguntia', 'Times New Roman', serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-feature-settings: 'liga' 1;
+}
+
+/* Wide tracked sans for GOLD */
+.font-gold {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+}
