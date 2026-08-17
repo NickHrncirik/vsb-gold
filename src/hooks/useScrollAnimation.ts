@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import type { Group, PerspectiveCamera } from 'three'
 
 gsap.registerPlugin(ScrollTrigger)
+ScrollTrigger.config({ ignoreMobileResize: true })
 
 const DEG = Math.PI / 180
 const TAU = Math.PI * 2
@@ -19,12 +20,43 @@ interface UseScrollAnimationArgs {
   movementScale?: number
   cameraTravel?: number
   keyLightIntensityRef?: React.RefObject<{ value: number }>
+  enableMouseParallax?: boolean
+  isTouch?: boolean
+  onInvalidate?: () => void
+}
+
+function clamp01(t: number) {
+  return t < 0 ? 0 : t > 1 ? 1 : t
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
+function smoothstep(t: number) {
+  const x = clamp01(t)
+  return x * x * (3 - 2 * x)
+}
+
+/** Piecewise sample — reverse is the same function as forward. */
+function sample(times: number[], values: number[], t: number, smooth = true) {
+  if (t <= times[0]) return values[0]
+  const last = times.length - 1
+  if (t >= times[last]) return values[last]
+  for (let i = 0; i < last; i++) {
+    const t1 = times[i + 1]
+    if (t <= t1) {
+      const u = (t - times[i]) / (t1 - times[i])
+      return lerp(values[i], values[i + 1], smooth ? smoothstep(u) : u)
+    }
+  }
+  return values[last]
 }
 
 /**
  * Cinematic product scroll:
  * zoom in → full 360° turn right → zoom out.
- * No object disassembly.
+ * Driven by a single progress sampler so reverse scroll cannot jump.
  */
 export function useScrollAnimation({
   triggerRef,
@@ -35,11 +67,15 @@ export function useScrollAnimation({
   movementScale = 0.65,
   cameraTravel = 1.35,
   keyLightIntensityRef,
+  enableMouseParallax = true,
+  isTouch = false,
+  onInvalidate,
 }: UseScrollAnimationArgs) {
-  const mouseActiveRef = useRef(true)
   const mouseTargetRef = useRef({ x: 0, y: 0 })
   const mouseCurrentRef = useRef({ x: 0, y: 0 })
-  const baseRotationRef = useRef({ x: 0, y: 0 })
+  const progressRef = useRef(0)
+  const invalidateRef = useRef(onInvalidate)
+  invalidateRef.current = onInvalidate
 
   useEffect(() => {
     if (!enabled) return
@@ -50,171 +86,113 @@ export function useScrollAnimation({
     if (!trigger || !root || !camera) return
 
     const s = movementScale
-    const startCam = { x: 0, y: 0.08, z: 6.2 }
-    const startRot = {
-      x: root.rotation.x,
-      y: root.rotation.y,
-      z: root.rotation.z,
-    }
-    const startPos = {
-      x: root.position.x,
-      y: root.position.y,
-      z: root.position.z,
+    const z0 = 6.2
+    const y0 = 0.08
+
+    const camT = [0, 0.16, 0.36, 0.56, 0.78, 1]
+    const camX = [0, -0.12 * s, 0.18 * s, -0.22 * s, 0.16 * s, -0.05 * s]
+    const camY = [y0, y0 + 0.04, y0 - 0.02, y0 + 0.06, y0, y0 + 0.05]
+    const camZ = [
+      z0,
+      z0 - cameraTravel * 0.45,
+      z0 - cameraTravel,
+      z0 - cameraTravel * 0.92,
+      z0 - cameraTravel * 0.35,
+      z0 + 0.15,
+    ]
+
+    const liftT = [0, 0.14, 0.78, 1]
+    const liftY = [0, 0.08 * s, 0.04 * s, 0]
+
+    const apply = (p: number) => {
+      const t = clamp01(p)
+      camera.position.set(
+        sample(camT, camX, t),
+        sample(camT, camY, t),
+        sample(camT, camZ, t),
+      )
+
+      root.position.y = sample(liftT, liftY, t)
+
+      const spin = smoothstep(clamp01((t - 0.06) / 0.9))
+      const ry = spin * (TAU + 18 * DEG)
+      const rx =
+        lerp(0, -8 * DEG, smoothstep(clamp01(t / 0.55))) +
+        lerp(0, 4 * DEG, smoothstep(clamp01((t - 0.72) / 0.28)))
+
+      let mx = 0
+      let my = 0
+      if (enableMouseParallax) {
+        const mouseMix = 1 - smoothstep(clamp01(t / 0.05))
+        const cur = mouseCurrentRef.current
+        const tgt = mouseTargetRef.current
+        if (mouseMix < 0.01) {
+          tgt.x = 0
+          tgt.y = 0
+        }
+        cur.x += (tgt.x * mouseMix - cur.x) * 0.08
+        cur.y += (tgt.y * mouseMix - cur.y) * 0.08
+        mx = cur.x
+        my = cur.y
+      }
+
+      root.rotation.x = rx + mx
+      root.rotation.y = ry + my
+      root.rotation.z = 0
+
+      if (keyLightIntensityRef?.current) {
+        keyLightIntensityRef.current.value = sample([0, 0.22, 1], [0.55, 0.78, 0.6], t)
+      }
+
+      invalidateRef.current?.()
     }
 
-    camera.position.set(startCam.x, startCam.y, startCam.z)
-    baseRotationRef.current = { x: startRot.x, y: startRot.y }
+    apply(0)
 
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger,
-        start: 'top top',
-        end: `+=${scrollDistance}`,
-        scrub: 0.85,
-        pin: true,
-        anticipatePin: 1,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => {
-          mouseActiveRef.current = self.progress < 0.03
-        },
+    const st = ScrollTrigger.create({
+      trigger,
+      start: 'top top',
+      end: `+=${scrollDistance}`,
+      scrub: isTouch ? 0.15 : 0.4,
+      pin: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        progressRef.current = self.progress
+        apply(self.progress)
       },
-      defaults: { ease: 'none' },
+      onRefresh: (self) => {
+        progressRef.current = self.progress
+        apply(self.progress)
+      },
     })
 
-    // —— 1. Ease in: slight lift + begin zoom ——
-    tl.to(
-      root.position,
-      {
-        y: startPos.y + 0.08 * s,
-        duration: 0.8,
-        ease: 'power1.inOut',
-      },
-      0,
-    )
-
-    tl.to(
-      camera.position,
-      {
-        z: startCam.z - cameraTravel * 0.45,
-        x: -0.12 * s,
-        y: startCam.y + 0.04,
-        duration: 1.0,
-        ease: 'power1.inOut',
-      },
-      0,
-    )
-
-    if (keyLightIntensityRef?.current) {
-      tl.to(keyLightIntensityRef.current, { value: 0.78, duration: 1.2 }, 0)
+    if (!enableMouseParallax) {
+      return () => {
+        st.kill()
+        root.position.set(0, 0, 0)
+        root.rotation.set(0, 0, 0)
+        camera.position.set(0, y0, z0)
+      }
     }
 
-    // —— 2. Zoom in (hero close-up) ——
-    tl.to(
-      camera.position,
-      {
-        z: startCam.z - cameraTravel,
-        x: 0.18 * s,
-        y: startCam.y - 0.02,
-        duration: 1.4,
-        ease: 'power2.inOut',
-      },
-      0.7,
-    )
-
-    // —— 3. Full 360° turn to the right (positive Y) ——
-    // Sync rotation across the mid scroll so the spin feels continuous.
-    tl.to(
-      root.rotation,
-      {
-        y: startRot.y + TAU,
-        x: startRot.x - 8 * DEG,
-        z: startRot.z,
-        duration: 3.2,
-        ease: 'power1.inOut',
-        onUpdate: () => {
-          baseRotationRef.current.x = root.rotation.x
-          baseRotationRef.current.y = root.rotation.y
-        },
-      },
-      0.5,
-    )
-
-    // Soft camera drift while spinning (keeps depth alive)
-    tl.to(
-      camera.position,
-      {
-        x: -0.22 * s,
-        y: startCam.y + 0.06,
-        duration: 1.6,
-        ease: 'sine.inOut',
-      },
-      1.8,
-    )
-    tl.to(
-      camera.position,
-      {
-        x: 0.2 * s,
-        y: startCam.y,
-        duration: 1.4,
-        ease: 'sine.inOut',
-      },
-      3.2,
-    )
-
-    // —— 4. Zoom out to composed product shot ——
-    tl.to(
-      camera.position,
-      {
-        z: startCam.z + 0.15,
-        x: -0.05 * s,
-        y: startCam.y + 0.05,
-        duration: 1.35,
-        ease: 'power2.inOut',
-      },
-      3.8,
-    )
-
-    tl.to(
-      root.position,
-      {
-        x: startPos.x,
-        y: startPos.y,
-        z: startPos.z,
-        duration: 1.2,
-        ease: 'power1.inOut',
-      },
-      3.9,
-    )
-
-    // Settle upright after full turn (facing slightly toward brand copy on the right)
-    tl.to(
-      root.rotation,
-      {
-        y: startRot.y + TAU + 18 * DEG,
-        x: startRot.x - 4 * DEG,
-        z: 0,
-        duration: 1.0,
-        ease: 'sine.out',
-        onUpdate: () => {
-          baseRotationRef.current.x = root.rotation.x
-          baseRotationRef.current.y = root.rotation.y
-        },
-      },
-      4.0,
-    )
-
-    if (keyLightIntensityRef?.current) {
-      tl.to(keyLightIntensityRef.current, { value: 0.6, duration: 1.0 }, 4.0)
+    const onMove = (e: MouseEvent) => {
+      if (progressRef.current > 0.06) return
+      const max = 4 * DEG
+      const nx = (e.clientX / window.innerWidth) * 2 - 1
+      const ny = (e.clientY / window.innerHeight) * 2 - 1
+      mouseTargetRef.current.x = -ny * max
+      mouseTargetRef.current.y = nx * max
+      apply(progressRef.current)
     }
+    window.addEventListener('mousemove', onMove, { passive: true })
 
     return () => {
-      tl.scrollTrigger?.kill()
-      tl.kill()
-      root.position.set(startPos.x, startPos.y, startPos.z)
-      root.rotation.set(startRot.x, startRot.y, startRot.z)
-      baseRotationRef.current = { x: startRot.x, y: startRot.y }
-      camera.position.set(startCam.x, startCam.y, startCam.z)
-      ScrollTrigger.refresh()
+      window.removeEventListener('mousemove', onMove)
+      st.kill()
+      root.position.set(0, 0, 0)
+      root.rotation.set(0, 0, 0)
+      camera.position.set(0, y0, z0)
     }
   }, [
     enabled,
@@ -225,36 +203,7 @@ export function useScrollAnimation({
     movementScale,
     cameraTravel,
     keyLightIntensityRef,
+    enableMouseParallax,
+    isTouch,
   ])
-
-  // Gentle mouse parallax only at the very start
-  useEffect(() => {
-    const max = 4 * DEG
-    const onMove = (e: MouseEvent) => {
-      if (!mouseActiveRef.current) return
-      const nx = (e.clientX / window.innerWidth) * 2 - 1
-      const ny = (e.clientY / window.innerHeight) * 2 - 1
-      mouseTargetRef.current.x = -ny * max
-      mouseTargetRef.current.y = nx * max
-    }
-    window.addEventListener('mousemove', onMove, { passive: true })
-    let raf = 0
-    const tick = () => {
-      const root = jewelryRootRef.current
-      if (root && mouseActiveRef.current) {
-        const cur = mouseCurrentRef.current
-        const tgt = mouseTargetRef.current
-        cur.x += (tgt.x - cur.x) * 0.06
-        cur.y += (tgt.y - cur.y) * 0.06
-        root.rotation.x = baseRotationRef.current.x + cur.x
-        root.rotation.y = baseRotationRef.current.y + cur.y
-      }
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      cancelAnimationFrame(raf)
-    }
-  }, [jewelryRootRef])
 }

@@ -7,34 +7,33 @@ interface BrandMarkProps {
 }
 
 const sizeMap = {
-  sm: { vsb: 'text-3xl', gold: 'text-[0.6rem] tracking-[0.55em]', gap: 'mt-1.5' },
-  md: { vsb: 'text-5xl', gold: 'text-xs tracking-[0.55em]', gap: 'mt-2' },
-  lg: { vsb: 'text-6xl md:text-7xl', gold: 'text-sm tracking-[0.58em]', gap: 'mt-2.5' },
-  hero: {
-    vsb: 'text-6xl sm:text-7xl md:text-[5.5rem]',
-    gold: 'text-sm md:text-base tracking-[0.6em]',
-    gap: 'mt-3',
-  },
+  sm: 'h-11 w-auto sm:h-12',
+  md: 'h-16 w-auto',
+  lg: 'h-24 w-auto md:h-28',
+  hero: 'h-[4.75rem] w-auto sm:h-32 md:h-40 lg:h-48',
 }
 
-/**
- * Typographic mark matching the brand lockup:
- * #VSB — blackletter (Textura / Old English feel)
- * GOLD — clean wide-tracked sans
- */
+/** Official lockup PNG — cream plate + black #VSB GOLD. */
 function BrandMarkComponent({
   size = 'md',
   className = '',
   align = 'center',
 }: BrandMarkProps) {
-  const s = sizeMap[size]
   const alignCls =
-    align === 'end' ? 'items-end text-right' : align === 'start' ? 'items-start text-left' : 'items-center text-center'
+    align === 'end'
+      ? 'items-end'
+      : align === 'start'
+        ? 'items-start'
+        : 'items-center'
 
   return (
-    <div className={`flex flex-col leading-none ${alignCls} ${className}`}>
-      <span className={`font-brand text-[var(--ink)] ${s.vsb}`}>#VSB</span>
-      <span className={`font-gold text-[var(--ink)] ${s.gap} ${s.gold}`}>Gold</span>
+    <div className={`flex ${alignCls} ${className}`}>
+      <img
+        src="/brand/logo.png?v=3"
+        alt="#VSB GOLD"
+        className={`${sizeMap[size]} max-w-none select-none`}
+        draggable={false}
+      />
     </div>
   )
 }

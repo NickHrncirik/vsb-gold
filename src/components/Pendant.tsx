@@ -9,12 +9,13 @@ import type { JewelryPartMap } from '../types/jewelry'
 export { PENDANT_GLB_PATH }
 
 /** Force polished gold look for product jewelry. */
-function polishJewelryMaterials(root: THREE.Object3D) {
+function polishJewelryMaterials(root: THREE.Object3D, enableShadows: boolean) {
   root.traverse((child) => {
     const mesh = child as Mesh
     if (!mesh.isMesh) return
-    mesh.castShadow = true
-    mesh.receiveShadow = true
+    mesh.castShadow = enableShadows
+    mesh.receiveShadow = enableShadows
+    mesh.frustumCulled = true
 
     const apply = (mat: THREE.Material) => {
       const m = mat as MeshStandardMaterial
@@ -22,7 +23,7 @@ function polishJewelryMaterials(root: THREE.Object3D) {
       m.color.set('#c9a84a')
       m.metalness = 0.95
       m.roughness = 0.26
-      m.envMapIntensity = 1.15
+      m.envMapIntensity = 1.45
       m.needsUpdate = true
     }
 
@@ -33,15 +34,21 @@ function polishJewelryMaterials(root: THREE.Object3D) {
 
 function GlbPendant({
   onPartsReady,
+  offset,
+  scale,
+  enableShadows,
 }: {
   onPartsReady: (root: Group, parts: JewelryPartMap) => void
+  offset: [number, number, number]
+  scale: number
+  enableShadows: boolean
 }) {
   const { scene } = useGLTF(PENDANT_GLB_PATH)
   const rootRef = useRef<Group>(null)
 
   const cloned = useMemo(() => {
     const c = scene.clone(true)
-    polishJewelryMaterials(c)
+    polishJewelryMaterials(c, enableShadows)
 
     const box = new THREE.Box3().setFromObject(c)
     const size = box.getSize(new THREE.Vector3())
@@ -50,7 +57,7 @@ function GlbPendant({
     box.setFromObject(c)
     c.position.sub(box.getCenter(new THREE.Vector3()))
     return c
-  }, [scene])
+  }, [scene, enableShadows])
 
   useLayoutEffect(() => {
     if (!rootRef.current) return
@@ -58,13 +65,10 @@ function GlbPendant({
   }, [cloned, onPartsReady])
 
   return (
-    <group
-      ref={rootRef}
-      name="PendantRoot"
-      position={[-1.2, 0.1, 0]}
-      rotation={[0.15, 0.45, -0.08]}
-    >
-      <primitive object={cloned} />
+    <group ref={rootRef} name="PendantRoot">
+      <group position={offset} rotation={[0.15, 0.45, -0.08]} scale={scale}>
+        <primitive object={cloned} />
+      </group>
     </group>
   )
 }
@@ -72,8 +76,12 @@ function GlbPendant({
 /** Minimal fallback only if the GLB fails to load. */
 function FallbackOrb({
   onPartsReady,
+  offset,
+  scale,
 }: {
   onPartsReady: (root: Group, parts: JewelryPartMap) => void
+  offset: [number, number, number]
+  scale: number
 }) {
   const rootRef = useRef<Group>(null)
   useLayoutEffect(() => {
@@ -82,15 +90,17 @@ function FallbackOrb({
   }, [onPartsReady])
 
   return (
-    <group ref={rootRef} position={[-1.15, 0, 0]}>
-      <mesh name="Medallion" castShadow>
-        <torusGeometry args={[0.6, 0.18, 24, 48]} />
-        <meshStandardMaterial color="#c9a84a" metalness={0.92} roughness={0.28} />
-      </mesh>
-      <mesh name="Gem" castShadow position={[0, 0, 0.1]}>
-        <octahedronGeometry args={[0.25, 0]} />
-        <meshStandardMaterial color="#1a4a6e" metalness={0.1} roughness={0.1} />
-      </mesh>
+    <group ref={rootRef}>
+      <group position={offset} scale={scale}>
+        <mesh name="Medallion" castShadow>
+          <torusGeometry args={[0.6, 0.18, 16, 32]} />
+          <meshStandardMaterial color="#c9a84a" metalness={0.92} roughness={0.28} />
+        </mesh>
+        <mesh name="Gem" castShadow position={[0, 0, 0.1]}>
+          <octahedronGeometry args={[0.25, 0]} />
+          <meshStandardMaterial color="#1a4a6e" metalness={0.1} roughness={0.1} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -112,13 +122,27 @@ class GlbErrorBoundary extends Component<
 interface PendantProps {
   useGlb: boolean
   onPartsReady: (root: Group, parts: JewelryPartMap) => void
+  offset?: [number, number, number]
+  scale?: number
+  enableShadows?: boolean
 }
 
-function PendantComponent({ useGlb, onPartsReady }: PendantProps) {
-  if (!useGlb) return <FallbackOrb onPartsReady={onPartsReady} />
+function PendantComponent({
+  useGlb,
+  onPartsReady,
+  offset = [-1.2, 0.1, 0],
+  scale = 1,
+  enableShadows = true,
+}: PendantProps) {
+  if (!useGlb) return <FallbackOrb onPartsReady={onPartsReady} offset={offset} scale={scale} />
   return (
-    <GlbErrorBoundary fallback={<FallbackOrb onPartsReady={onPartsReady} />}>
-      <GlbPendant onPartsReady={onPartsReady} />
+    <GlbErrorBoundary fallback={<FallbackOrb onPartsReady={onPartsReady} offset={offset} scale={scale} />}>
+      <GlbPendant
+        onPartsReady={onPartsReady}
+        offset={offset}
+        scale={scale}
+        enableShadows={enableShadows}
+      />
     </GlbErrorBoundary>
   )
 }

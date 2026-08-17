@@ -22,11 +22,25 @@ export interface JewelryRefs {
   parts: JewelryPartMap
 }
 
+export type QualityTier = 'low' | 'medium' | 'high'
+
 export interface DeviceProfile {
   isMobile: boolean
   isTablet: boolean
-  movementScale: number
+  isTouch: boolean
+  quality: QualityTier
+  dpr: [number, number]
+  antialias: boolean
   enableShadows: boolean
-  bloomIntensity: number
+  enableContactShadows: boolean
+  enableBloom: boolean
+  enableEnvironment: boolean
+  enableMouseParallax: boolean
+  movementScale: number
   cameraTravel: number
+  bloomIntensity: number
+  scrollDistance: number
+  fov: number
+  pendantOffset: [number, number, number]
+  pendantScale: number
 }

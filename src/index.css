@@ -45,6 +45,17 @@ body,
   overflow-x: hidden;
 }
 
+html.is-lite body::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.is-lite body::before,
+  body::before {
+    display: none;
+  }
+}
+
 body::before {
   content: '';
   pointer-events: none;

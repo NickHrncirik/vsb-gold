@@ -1,29 +1,46 @@
 import { useEffect, useState } from 'react'
 import type { DeviceProfile } from '../types/jewelry'
+import { applyLiteDocumentClass, computeDeviceProfile } from '../utils/detectQuality'
 
-function computeProfile(width: number): DeviceProfile {
-  const isMobile = width < 768
-  const isTablet = width >= 768 && width < 1024
-
-  return {
-    isMobile,
-    isTablet,
-    movementScale: isMobile ? 0.45 : isTablet ? 0.55 : 0.65,
-    enableShadows: !isMobile,
-    bloomIntensity: isMobile ? 0.06 : isTablet ? 0.1 : 0.12,
-    cameraTravel: isMobile ? 0.8 : isTablet ? 1.0 : 1.2,
-  }
+function sameProfile(a: DeviceProfile, b: DeviceProfile) {
+  return (
+    a.quality === b.quality &&
+    a.isMobile === b.isMobile &&
+    a.isTablet === b.isTablet &&
+    a.scrollDistance === b.scrollDistance &&
+    a.dpr[1] === b.dpr[1] &&
+    a.pendantOffset[0] === b.pendantOffset[0] &&
+    a.pendantOffset[1] === b.pendantOffset[1] &&
+    a.pendantScale === b.pendantScale
+  )
 }
 
 export function useDeviceProfile(): DeviceProfile {
-  const [profile, setProfile] = useState<DeviceProfile>(() =>
-    computeProfile(typeof window !== 'undefined' ? window.innerWidth : 1280),
-  )
+  const [profile, setProfile] = useState<DeviceProfile>(() => computeDeviceProfile())
 
   useEffect(() => {
-    const onResize = () => setProfile(computeProfile(window.innerWidth))
+    applyLiteDocumentClass(profile.quality)
+  }, [profile.quality])
+
+  useEffect(() => {
+    let timer = 0
+    const apply = () => {
+      const next = computeDeviceProfile(window.innerWidth)
+      setProfile((prev) => (sameProfile(prev, next) ? prev : next))
+    }
+    const onResize = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(apply, 180)
+    }
     window.addEventListener('resize', onResize, { passive: true })
-    return () => window.removeEventListener('resize', onResize)
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onMotion = () => apply()
+    motion.addEventListener('change', onMotion)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('resize', onResize)
+      motion.removeEventListener('change', onMotion)
+    }
   }, [])
 
   return profile

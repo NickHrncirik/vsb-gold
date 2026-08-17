@@ -18,26 +18,26 @@ const CHAPTERS = [
   {
     id: 'intro',
     kicker: 'Collection 01',
-    title: 'Skull pendant.',
-    body: 'Cast weight. Quiet luxury.',
+    title: 'Skull.',
+    body: 'Gold with weight. Street and craft in one piece.',
   },
   {
     id: 'closer',
     kicker: 'Detail',
     title: 'Closer.',
-    body: 'Every ridge catches the light.',
+    body: 'Every ridge holds the light. Nothing extra.',
   },
   {
     id: 'turn',
     kicker: 'Form',
     title: 'Full turn.',
-    body: 'Three hundred sixty degrees of gold.',
+    body: 'Three hundred sixty degrees of gold — no posing.',
   },
   {
     id: 'settle',
-    kicker: '#VSB GOLD',
+    kicker: 'House of Madness',
     title: 'Wear it.',
-    body: 'No noise. Only presence.',
+    body: 'Weight on the neck. Weight in life.',
   },
 ] as const
 
@@ -68,23 +68,28 @@ function HeroComponent({ profile, onSceneReady, onLoadProgress }: HeroProps) {
     const intro = introRef.current
     if (!section || !intro || !modelReady) return
 
-    const SCROLL = 3200
-    // Non-overlapping windows — only one chapter visible at a time
+    const SCROLL = profile.scrollDistance
+    // Non-overlapping windows — last chapter holds until the pin ends
     const windows = [
       [0.14, 0.30],
       [0.34, 0.50],
       [0.54, 0.70],
-      [0.74, 0.92],
+      [0.76, 1],
     ] as const
+    const lastChapter = windows.length - 1
 
     const setChapterVisibility = (progress: number) => {
       chapterRefs.current.forEach((el, i) => {
         if (!el) return
         const [start, end] = windows[i]
         const span = end - start
-        const fade = Math.min(0.18, span * 0.35)
+        const fade = Math.min(0.12, span * 0.35)
+        const holdLast = i === lastChapter
         let opacity = 0
-        if (progress > start && progress < end) {
+        if (holdLast) {
+          if (progress >= start + fade) opacity = 1
+          else if (progress > start) opacity = (progress - start) / fade
+        } else if (progress > start && progress < end) {
           if (progress < start + fade) opacity = (progress - start) / fade
           else if (progress > end - fade) opacity = (end - progress) / fade
           else opacity = 1
@@ -128,12 +133,12 @@ function HeroComponent({ profile, onSceneReady, onLoadProgress }: HeroProps) {
     }, section)
 
     return () => ctx.revert()
-  }, [modelReady])
+  }, [modelReady, profile.scrollDistance])
 
   return (
     <section
       ref={sectionRef}
-      className="relative w-full h-screen overflow-hidden"
+      className="relative w-full h-[100dvh] overflow-hidden"
       style={{
         background:
           'radial-gradient(ellipse 85% 70% at 38% 48%, #ffffff 0%, var(--bg) 48%, var(--bg-deep) 100%)',
@@ -153,16 +158,28 @@ function HeroComponent({ profile, onSceneReady, onLoadProgress }: HeroProps) {
         )}
       </div>
 
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[48%] bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/85 to-transparent lg:hidden"
+        aria-hidden
+      />
+
       {/* Opening brand */}
       <div
         ref={introRef}
-        className="pointer-events-none absolute inset-0 z-10 flex flex-col items-end justify-center pr-8 sm:pr-14 md:pr-[10vw]"
+        className="pointer-events-none absolute inset-0 z-10 flex flex-col items-end justify-end pb-[max(5.5rem,18dvh)] pr-5 pl-5 lg:justify-center lg:pb-0 lg:pl-0 lg:pr-[10vw]"
       >
-        <BrandMark size="hero" align="end" className="mb-8" />
-        <p className="font-light text-sm md:text-base tracking-[0.08em] text-[var(--ink-soft)] max-w-xs text-right">
-          Crafted light.
+        <BrandMark size="hero" align="end" className="mb-3 sm:mb-6 lg:mb-8" />
+        <p className="font-gold text-[0.6rem] sm:text-xs text-[var(--ink)] mb-3">
+          House of Madness
         </p>
-        <div className="mt-12 flex flex-col items-end gap-2 opacity-60">
+        <p className="font-light text-[0.8rem] sm:text-sm md:text-base tracking-[0.06em] text-[var(--ink-soft)] max-w-[16rem] sm:max-w-xs text-right">
+          Craft and culture fused into jewelry that means something.
+        </p>
+        <p className="mt-5 hidden font-light text-xs lg:block lg:text-sm leading-relaxed tracking-[0.04em] text-[var(--muted)] max-w-[18rem] text-right">
+          #VSB GOLD is a brand born from the street and precise craft. We join gold, diamonds, and
+          street culture into jewelry that carries weight — on the neck and in life.
+        </p>
+        <div className="mt-7 lg:mt-12 flex flex-col items-end gap-2 opacity-60">
           <span className="text-[10px] tracking-[0.4em] uppercase text-[var(--muted)]">
             Scroll
           </span>
@@ -177,12 +194,12 @@ function HeroComponent({ profile, onSceneReady, onLoadProgress }: HeroProps) {
           ref={(el) => {
             chapterRefs.current[i] = el
           }}
-          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-end justify-end pb-[14vh] pr-8 sm:pr-14 md:pr-[10vw] opacity-0"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-end justify-end pb-[max(4.5rem,14dvh)] pr-5 pl-5 lg:pr-[10vw] lg:pl-0 opacity-0"
         >
           <p className="text-[10px] tracking-[0.35em] uppercase text-[var(--muted)] mb-3">
             {ch.kicker}
           </p>
-          <h2 className="font-brand text-4xl sm:text-5xl md:text-6xl text-[var(--ink)] leading-none">
+          <h2 className="font-brand text-[2.4rem] sm:text-5xl md:text-6xl text-[var(--ink)] leading-none">
             {ch.title}
           </h2>
           <p className="mt-4 max-w-xs text-right text-sm md:text-base font-light tracking-[0.06em] text-[var(--ink-soft)]">

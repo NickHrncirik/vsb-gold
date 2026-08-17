@@ -1,17 +1,19 @@
-import { memo, useCallback, useEffect, useRef, useState, Suspense } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { memo, useCallback, useEffect, useRef, useState, Suspense, type Dispatch, type SetStateAction } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
+  AdaptiveDpr,
   ContactShadows,
   Environment,
+  PerformanceMonitor,
   PerspectiveCamera,
-  AdaptiveDpr,
 } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import type { Group, PerspectiveCamera as ThreePerspectiveCamera } from 'three'
 import { Pendant, preloadPendantGlb } from './Pendant'
 import { useScrollAnimation } from '../hooks/useScrollAnimation'
-import type { DeviceProfile, JewelryPartMap } from '../types/jewelry'
+import type { DeviceProfile, JewelryPartMap, QualityTier } from '../types/jewelry'
+import { minQuality } from '../utils/detectQuality'
 
 interface SceneProps {
   triggerRef: React.RefObject<HTMLElement | null>
@@ -35,7 +37,17 @@ function CameraRig({
   return null
 }
 
-function JewelryScene({ triggerRef, profile, useGlb, onReady }: SceneProps) {
+function JewelryScene({
+  triggerRef,
+  profile,
+  useGlb,
+  onReady,
+  quality,
+  setQuality,
+}: SceneProps & {
+  quality: QualityTier
+  setQuality: Dispatch<SetStateAction<QualityTier>>
+}) {
   const jewelryRootRef = useRef<Group | null>(null)
   const partsRef = useRef<JewelryPartMap>({})
   const cameraRef = useRef<ThreePerspectiveCamera | null>(null)
@@ -44,6 +56,13 @@ function JewelryScene({ triggerRef, profile, useGlb, onReady }: SceneProps) {
   const [cameraReady, setCameraReady] = useState(false)
   const keyLightRef = useRef<THREE.DirectionalLight>(null)
   const readySent = useRef(false)
+  const invalidate = useThree((s) => s.invalidate)
+
+  const bloom = quality === 'high'
+  const shadows = quality === 'high'
+  const contact = quality === 'high'
+  const bright = profile.isMobile || profile.isTablet || quality === 'low'
+  const lightBoost = bright ? 1.75 : 1
 
   const onPartsReady = useCallback(
     (root: Group, parts: JewelryPartMap) => {
@@ -66,106 +85,145 @@ function JewelryScene({ triggerRef, profile, useGlb, onReady }: SceneProps) {
     partsRef,
     cameraRef,
     enabled: partsReady && cameraReady,
-    scrollDistance: 3200,
+    scrollDistance: profile.scrollDistance,
     movementScale: profile.movementScale,
     cameraTravel: profile.cameraTravel,
     keyLightIntensityRef,
+    enableMouseParallax: profile.enableMouseParallax,
+    isTouch: profile.isTouch,
+    onInvalidate: invalidate,
   })
 
-  useEffect(() => {
-    let raf = 0
-    const tick = () => {
-      if (keyLightRef.current) {
-        keyLightRef.current.intensity = keyLightIntensityRef.current.value
-      }
-      raf = requestAnimationFrame(tick)
+  useFrame(() => {
+    if (keyLightRef.current) {
+      keyLightRef.current.intensity = keyLightIntensityRef.current.value * lightBoost
     }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [])
+  })
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0.05, 6.2]} fov={30} near={0.1} far={100} />
+      <PerformanceMonitor
+        ms={250}
+        iterations={6}
+        step={0.2}
+        flipflops={2}
+        bounds={(fps) => [Math.min(40, fps * 0.55), fps]}
+        onDecline={() => setQuality((q) => (q === 'high' ? 'medium' : 'low'))}
+        onFallback={() => setQuality('low')}
+      />
+      <AdaptiveDpr pixelated={quality === 'low'} />
+
+      <PerspectiveCamera
+        makeDefault
+        position={[0, 0.05, 6.2]}
+        fov={profile.fov}
+        near={0.1}
+        far={40}
+      />
       <CameraRig cameraRef={cameraRef} onReady={onCameraReady} />
 
       <color attach="background" args={['#fdf5e8']} />
-      <fog attach="fog" args={['#fdf5e8', 10, 26]} />
+      {!profile.isMobile && <fog attach="fog" args={['#fdf5e8', 12, 28]} />}
 
-      <ambientLight intensity={0.55} color="#ffffff" />
+      <hemisphereLight args={['#fff6e8', '#d4c4a8', bright ? 0.7 : 0.35]} />
+      <ambientLight intensity={bright ? 0.95 : 0.55} color="#fff8ee" />
       <directionalLight
         ref={keyLightRef}
-        castShadow={profile.enableShadows}
-        position={[3.5, 5, 4]}
-        intensity={0.55}
-        color="#fff8ee"
-        shadow-mapSize={[profile.isMobile ? 512 : 1024, profile.isMobile ? 512 : 1024]}
+        castShadow={shadows}
+        position={[2.8, 5.2, 5]}
+        intensity={bright ? 1.05 : 0.55}
+        color="#fff4e4"
+        shadow-mapSize={shadows ? [1024, 1024] : [256, 256]}
         shadow-bias={-0.0002}
       />
-      <directionalLight position={[-2.5, 1.5, -1.5]} intensity={0.25} color="#d8e0f0" />
-      <spotLight
-        position={[-1.2, 4, 2.5]}
-        angle={0.35}
-        penumbra={0.85}
-        intensity={0.3}
-        color="#fff0d8"
-      />
+      <directionalLight position={[-3.2, 2.2, 1.5]} intensity={bright ? 0.55 : 0.25} color="#e8eef8" />
+      <directionalLight position={[0.4, -1.2, 3.5]} intensity={bright ? 0.35 : 0.12} color="#ffe8c8" />
+      {quality === 'high' && (
+        <spotLight
+          position={[-1.2, 4, 2.5]}
+          angle={0.35}
+          penumbra={0.85}
+          intensity={0.3}
+          color="#fff0d8"
+        />
+      )}
 
-      <Environment preset="studio" environmentIntensity={0.35} />
+      <Environment preset="studio" environmentIntensity={bright ? 0.72 : 0.4} />
 
       <Suspense fallback={null}>
-        <Pendant useGlb={useGlb} onPartsReady={onPartsReady} />
+        <Pendant
+          useGlb={useGlb}
+          onPartsReady={onPartsReady}
+          offset={profile.pendantOffset}
+          scale={profile.pendantScale}
+          enableShadows={shadows}
+        />
       </Suspense>
 
-      {profile.enableShadows && (
+      {contact && (
         <ContactShadows
-          position={[-1.15, -1.35, 0]}
+          position={[profile.pendantOffset[0] + 0.05, -1.35, 0]}
           opacity={0.22}
           scale={8}
-          blur={3.2}
+          blur={2.4}
           far={3}
           color="#2a2418"
         />
       )}
 
-      <EffectComposer multisampling={profile.isMobile ? 0 : 4}>
-        <Bloom
-          intensity={profile.bloomIntensity}
-          luminanceThreshold={0.9}
-          luminanceSmoothing={0.55}
-          mipmapBlur
-        />
-        <Vignette eskil={false} offset={0.35} darkness={0.18} />
-      </EffectComposer>
-
-      <AdaptiveDpr />
+      {bloom && (
+        <EffectComposer multisampling={0} enableNormalPass={false}>
+          <Bloom
+            intensity={profile.bloomIntensity}
+            luminanceThreshold={0.9}
+            luminanceSmoothing={0.55}
+            mipmapBlur
+          />
+          <Vignette eskil={false} offset={0.35} darkness={0.18} />
+        </EffectComposer>
+      )}
     </>
   )
 }
 
 function SceneComponent({ triggerRef, profile, useGlb, onReady }: SceneProps) {
+  const [quality, setQuality] = useState<QualityTier>(profile.quality)
+
+  useEffect(() => {
+    setQuality((q) => minQuality(q, profile.quality))
+  }, [profile.quality])
+
   useEffect(() => {
     if (useGlb) preloadPendantGlb()
   }, [useGlb])
 
+  const demand = quality !== 'high'
+
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={profile.dpr}
+      frameloop={demand ? 'demand' : 'always'}
+      performance={{ min: 0.4, max: 1, debounce: 200 }}
       gl={{
-        antialias: true,
+        antialias: profile.antialias,
+        stencil: false,
+        depth: true,
+        alpha: false,
+        powerPreference: profile.quality === 'low' ? 'low-power' : 'high-performance',
         toneMapping: THREE.ACESFilmicToneMapping,
-        toneMappingExposure: 1.05,
+        toneMappingExposure: profile.isMobile ? 1.28 : 1.08,
         outputColorSpace: THREE.SRGBColorSpace,
-        powerPreference: 'high-performance',
       }}
       shadows={profile.enableShadows}
-      style={{ width: '100%', height: '100%', touchAction: 'none' }}
+      style={{ width: '100%', height: '100%', touchAction: 'pan-y' }}
     >
       <JewelryScene
         triggerRef={triggerRef}
         profile={profile}
         useGlb={useGlb}
         onReady={onReady}
+        quality={quality}
+        setQuality={setQuality}
       />
     </Canvas>
   )

@@ -1,0 +1,18 @@
+{
+  "name": "#VSB GOLD",
+  "short_name": "VSB GOLD",
+  "description": "Craft and culture fused into jewelry that means something.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf5e8",
+  "theme_color": "#fdf5e8",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
