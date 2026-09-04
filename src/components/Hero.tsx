@@ -22,7 +22,7 @@ function HeroComponent() {
       [0, 0.22],
       [0.26, 0.48],
       [0.52, 0.74],
-      [0.76, 0.88],
+      [0.76, 0.98],
     ] as const
 
     const setVisibility = (progress: number) => {
@@ -30,7 +30,7 @@ function HeroComponent() {
         if (!el) return
         const [start, end] = windows[i]
         const span = end - start
-        const fade = Math.min(0.08, span * 0.4)
+        const fade = Math.min(0.05, span * 0.35)
         let opacity = 0
 
         if (progress >= start && progress <= end) {
@@ -112,8 +112,8 @@ function HeroComponent() {
             </figure>
 
             <div
-              className={`flex w-full flex-col md:w-[min(46%,26rem)] ${
-                ch.imageLeft ? 'items-start text-left' : 'items-end text-right'
+              className={`flex w-full flex-col items-center text-center md:w-[min(46%,26rem)] ${
+                ch.imageLeft ? 'md:items-start md:text-left' : 'md:items-end md:text-right'
               }`}
             >
               {'variant' in ch && ch.variant === 'brand' ? (
@@ -123,6 +123,16 @@ function HeroComponent() {
                     align={ch.imageLeft ? 'start' : 'end'}
                     className="mb-6 md:mb-8"
                   />
+                  <p className="font-gold mb-3 text-[0.6rem] sm:text-xs text-[var(--ink)]">
+                    {SITE.tagline}
+                  </p>
+                  <p className="max-w-xs text-sm font-light tracking-[0.06em] text-[var(--ink-soft)] md:text-base">
+                    {SITE.manifesto}
+                  </p>
+                  <p className="mt-5 max-w-[18rem] text-xs font-light leading-relaxed tracking-[0.04em] text-[var(--muted)] md:text-sm">
+                    {SITE.description}
+                  </p>
+                </>
                   <p className="font-gold mb-3 text-[0.6rem] sm:text-xs text-[var(--ink)]">
                     {SITE.tagline}
                   </p>
