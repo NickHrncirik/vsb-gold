@@ -21,7 +21,7 @@ export function HomePage() {
         }}
       />
       <SiteHeader transparent />
-      <main className="relative bg-[var(--bg)]">
+      <main className="relative bg-[var(--bg-deep)]">
         <Hero />
         <SiteFooter />
       </main>

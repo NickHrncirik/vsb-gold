@@ -77,9 +77,10 @@ function HeroComponent() {
   return (
     <section
       ref={sectionRef}
-      className="relative h-[100dvh] w-full overflow-hidden"
+      className="relative h-[100lvh] min-h-[100dvh] w-full overflow-hidden"
       style={{
-        background:
+        backgroundColor: 'var(--bg-deep)',
+        backgroundImage:
           'radial-gradient(ellipse 90% 70% at 50% 40%, #ffffff 0%, var(--bg) 52%, var(--bg-deep) 100%)',
       }}
     >
@@ -89,7 +90,7 @@ function HeroComponent() {
           ref={(el) => {
             chapterRefs.current[i] = el
           }}
-          className={`absolute inset-0 flex items-start px-5 pb-8 pt-[calc(env(safe-area-inset-top)+5.75rem)] sm:px-8 md:items-center md:px-12 md:pt-0 lg:px-16 ${
+          className={`absolute inset-0 flex items-start px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+5.75rem)] sm:px-8 md:items-center md:px-12 md:pt-0 lg:px-16 ${
             i === 0 ? 'opacity-100' : 'invisible opacity-0'
           }`}
         >
