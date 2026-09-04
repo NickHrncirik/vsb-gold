@@ -207,7 +207,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
         </nav>
 
         <div className="absolute right-0 bottom-0 left-0 border-t border-[var(--line)] p-7">
-          <p className="font-gold mb-2 text-[0.65rem] text-[var(--ink)]">Gold</p>
+          <p className="font-gold mb-2 text-[0.65rem] text-[var(--ink)]">{SITE.name}</p>
           <p className="max-w-[16rem] text-xs font-light tracking-[0.06em] text-[var(--muted)]">
             {SITE.tagline}. {SITE.manifesto}
           </p>
