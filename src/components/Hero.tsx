@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { BrandMark } from './BrandMark'
@@ -14,7 +14,7 @@ function HeroComponent() {
   const sectionRef = useRef<HTMLElement>(null)
   const chapterRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const section = sectionRef.current
     if (!section) return
 
@@ -22,33 +22,29 @@ function HeroComponent() {
       [0, 0.22],
       [0.26, 0.48],
       [0.52, 0.74],
-      [0.78, 1],
+      [0.76, 0.88],
     ] as const
-    const last = windows.length - 1
 
     const setVisibility = (progress: number) => {
       chapterRefs.current.forEach((el, i) => {
         if (!el) return
         const [start, end] = windows[i]
         const span = end - start
-        const fade = Math.min(0.1, span * 0.35)
-        const holdLast = i === last
+        const fade = Math.min(0.08, span * 0.4)
         let opacity = 0
 
-        if (holdLast) {
-          if (progress >= start + fade) opacity = 1
-          else if (progress > start) opacity = (progress - start) / fade
-        } else if (progress >= start && progress < end) {
-          if (progress < start + fade && i !== 0) opacity = (progress - start) / fade
-          else if (i === 0 && progress < fade) opacity = 1
+        if (progress >= start && progress <= end) {
+          if (i === 0 && progress < start + fade) opacity = 1
+          else if (progress < start + fade) opacity = (progress - start) / fade
           else if (progress > end - fade) opacity = (end - progress) / fade
           else opacity = 1
         }
 
         opacity = Math.max(0, Math.min(1, opacity))
         el.style.opacity = String(opacity)
-        el.style.transform = `translate3d(0, ${(1 - opacity) * 16}px, 0)`
+        el.style.transform = opacity > 0.02 ? `translate3d(0, ${(1 - opacity) * 12}px, 0)` : 'none'
         el.style.visibility = opacity < 0.02 ? 'hidden' : 'visible'
+        el.style.pointerEvents = 'none'
         el.setAttribute('aria-hidden', opacity < 0.2 ? 'true' : 'false')
       })
     }
@@ -57,6 +53,7 @@ function HeroComponent() {
       if (!el) return
       el.style.opacity = i === 0 ? '1' : '0'
       el.style.visibility = i === 0 ? 'visible' : 'hidden'
+      el.style.transform = 'none'
     })
 
     const ctx = gsap.context(() => {
@@ -66,7 +63,7 @@ function HeroComponent() {
         end: `+=${SCROLL}`,
         pin: true,
         anticipatePin: 1,
-        scrub: 0.35,
+        scrub: 0.4,
         invalidateOnRefresh: true,
         onUpdate: (self) => setVisibility(self.progress),
         onRefresh: (self) => setVisibility(self.progress),
@@ -92,7 +89,9 @@ function HeroComponent() {
           ref={(el) => {
             chapterRefs.current[i] = el
           }}
-          className="absolute inset-0 flex items-center px-5 sm:px-8 md:px-12 lg:px-16"
+          className={`absolute inset-0 flex items-start px-5 pb-8 pt-[calc(env(safe-area-inset-top)+5.75rem)] sm:px-8 md:items-center md:px-12 md:pt-0 lg:px-16 ${
+            i === 0 ? 'opacity-100' : 'invisible opacity-0'
+          }`}
         >
           <div
             className={`mx-auto flex w-full max-w-6xl flex-col gap-8 md:flex-row md:items-center md:gap-16 lg:gap-24 ${
@@ -100,11 +99,14 @@ function HeroComponent() {
             }`}
           >
             <figure className="w-full md:w-[min(46%,28rem)]">
-              <div className="relative aspect-[4/5] overflow-hidden bg-[#0c0c0c] shadow-[0_28px_80px_rgba(18,12,6,0.16)] ring-1 ring-black/10">
+              <div className="relative mx-auto aspect-[4/5] h-[min(42dvh,19rem)] overflow-hidden bg-[#0c0c0c] shadow-[0_28px_80px_rgba(18,12,6,0.16)] ring-1 ring-black/10 md:h-auto md:w-full">
                 <img
                   src={ch.image}
                   alt={ch.title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  decoding={i === 0 ? 'sync' : 'async'}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  fetchPriority={i === 0 ? 'high' : 'low'}
+                  className="absolute inset-0 h-full w-full object-cover object-center"
                 />
               </div>
             </figure>
