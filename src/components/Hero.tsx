@@ -133,16 +133,6 @@ function HeroComponent() {
                     {SITE.description}
                   </p>
                 </>
-                  <p className="font-gold mb-3 text-[0.6rem] sm:text-xs text-[var(--ink)]">
-                    {SITE.tagline}
-                  </p>
-                  <p className="max-w-xs text-sm font-light tracking-[0.06em] text-[var(--ink-soft)] md:text-base">
-                    {SITE.manifesto}
-                  </p>
-                  <p className="mt-5 max-w-[18rem] text-xs font-light leading-relaxed tracking-[0.04em] text-[var(--muted)] md:text-sm">
-                    {SITE.description}
-                  </p>
-                </>
               ) : (
                 <>
                   <p className="mb-3 text-[10px] tracking-[0.35em] uppercase text-[var(--muted)]">
